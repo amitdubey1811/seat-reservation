@@ -479,11 +479,15 @@ individual commits stay visible on `main`.
 
 | PR | Branch | Contents |
 | --- | --- | --- |
-| 1 | `docs/implementation-plan` | this document and `SCHEMA.md` |
+| 1 | `docs/implementation-plan` | this document, `SCHEMA.md`, `PR-PLAN.md` |
 | 2 | `impl/scaffold-and-schema` | project setup, database schema, error handling |
 | 3 | `impl/config-and-auth` | the settings snapshot, tokens, identity |
-| 4 | `impl/reservation-engine` | shows, reserve, cancel, concurrency tests |
-| 5 | `impl/deploy-and-observe` | metrics, logs, burst script, deploy config, write-up |
+| 4 | `impl/shows` | creating a show, reporting its state |
+| 5 | `impl/reservation-engine` | reserve, cancel, concurrency tests |
+| 6 | `impl/deploy-and-observe` | metrics, logs, burst script, deploy config, write-up |
+
+[PR-PLAN.md](PR-PLAN.md) breaks each one down into files, commits, tests and
+acceptance checks.
 
 ### Already proven against a real Postgres
 

@@ -1,0 +1,417 @@
+# Delivery Plan — PR by PR
+
+Six pull requests, in order. Each one builds, runs, and is independently verifiable.
+
+Read [PLAN.md](PLAN.md) for the design and [SCHEMA.md](SCHEMA.md) for the data flow.
+
+---
+
+## Status at a glance
+
+| PR | Branch | Goal | State |
+| --- | --- | --- | --- |
+| 1 | `docs/implementation-plan` | Design documents | ✅ ready to merge |
+| 2 | `impl/scaffold-and-schema` | Project, schema, error handling | 🟡 5 of 7 commits done |
+| 3 | `impl/config-and-auth` | Settings snapshot, tokens, identity | ⬜ not started |
+| 4 | `impl/shows` | Create a show, report its state | ⬜ not started |
+| 5 | `impl/reservation-engine` | Reserve, cancel, concurrency tests | ⬜ not started |
+| 6 | `impl/deploy-and-observe` | Metrics, logs, burst script, deploy | ⬜ not started |
+
+## Ground rules for every PR
+
+- Branch off `main`, open a PR, merge with a **merge commit — never squash.** The
+  assignment grades incremental commit history, and squashing destroys exactly that.
+- Commit messages: short, imperative, lowercase. No `Co-Authored-By` lines.
+- A PR is not done until it **builds from clean** and its acceptance checks pass.
+- Each PR leaves `main` deployable. No PR depends on a later one to compile.
+
+## Dependency order
+
+```
+PR1 docs
+      ↓
+PR2 foundation ──→ PR3 config + auth ──→ PR4 shows ──→ PR5 reserve ──→ PR6 deploy
+```
+
+Strictly sequential. PR5 is the one that matters; PRs 2–4 exist to make it testable.
+
+---
+
+# PR 1 — Design documents
+
+**Branch** `docs/implementation-plan` · **Depends on** nothing
+
+### Goal
+
+Write down the design before building it, so the code has nothing to explain.
+
+### Files
+
+| File | State |
+| --- | --- |
+| `PLAN.md` | the design, in plain language |
+| `SCHEMA.md` | every table, and each endpoint's statement order |
+| `PR-PLAN.md` | this document |
+
+### Commits
+
+```
+add implementation plan
+revise plan for single-step confirmation and add schema walkthrough
+add pr-by-pr delivery plan
+```
+
+### Acceptance
+
+- [x] The atomic decision is named and its race-freeness argued
+- [x] Deadlock avoidance is explained as structural, not probabilistic
+- [x] Idempotency behaviour is specified for all three cases
+- [x] Rejected alternatives are recorded with reasons
+
+---
+
+# PR 2 — Foundation
+
+**Branch** `impl/scaffold-and-schema` · **Depends on** PR 1
+
+### Goal
+
+A service that boots, migrates a database, reports health, and can never answer a
+domain outcome with a `5xx`.
+
+### Files
+
+| File | New / changed |
+| --- | --- |
+| `pom.xml` | new — Spring Boot 3.4.1, JDBC, Flyway, Actuator, java-jwt, Testcontainers |
+| `Dockerfile` | new — multi-stage, non-root, `MaxRAMPercentage=70` |
+| `docker-compose.yml` | new — healthchecked Postgres 17 + app |
+| `CLAUDE.md`, `.gitignore` | new |
+| `src/main/resources/application.properties` | new — pool, Flyway retries, actuator health groups |
+| `src/main/resources/db/migration/V1__init.sql` | new — the whole schema |
+| `common/ApiError.java` | new — the complete error taxonomy |
+| `common/ApiException.java` | new — stackless, thrown thousands of times a second |
+| `common/ErrorResponse.java` | new |
+| `common/GlobalExceptionHandler.java` | new |
+| `common/RequestIdFilter.java`, `common/RequestId.java` | new — correlation id into MDC |
+| `common/PgErrors.java` | new — SQLSTATE inspection |
+| `SeatReservationApplication.java` | new |
+
+### Commits
+
+```
+✅ init: spring boot skeleton, dockerfile, compose
+✅ add flyway schema with seat, quota and idempotency tables
+✅ add error taxonomy, request id filter and exception handler
+✅ use application.properties instead of yaml
+✅ set hikari idle-timeout below max-lifetime
+⬜ simplify seat state to available and confirmed
+⬜ split pool timeout from database unavailability
+```
+
+### Remaining work
+
+**`simplify seat state to available and confirmed`** — reconciles `V1__init.sql` with the
+revised plan. Edits `V1` in place rather than adding a `V2` that undoes it, because
+nothing is pushed and a fresh clone should see one clean schema.
+
+- `seats`: drop `hold_expires_at`, rename `held_by` → `owner_id`, status check to two
+  values, coherence check to two branches, drop the `seats_expiring` index
+- `reservations`: drop `expires_at`, status check to `CONFIRMED` / `CANCELLED`
+- `idempotency_keys`: drop `status`, `response_status`, `response_body`
+- `service_config`: drop the two hold-related keys
+
+**`split pool timeout from database unavailability`**
+
+- `ApiError`: remove `REQUEST_IN_PROGRESS` (proven unobservable), add
+  `DEPENDENCY_UNAVAILABLE` → `503`
+- `GlobalExceptionHandler`: `SQLTransientConnectionException` (pool exhausted) → `429`;
+  SQLSTATE `08xxx` (cannot connect) → `503`; contention SQLSTATEs → `429`; rest → `500`
+
+### Acceptance
+
+- [ ] `mvn -DskipTests package` succeeds on JDK 21
+- [ ] Flyway applies cleanly to an empty database
+- [ ] App boots; `/actuator/health/liveness` returns `200`
+- [ ] `/actuator/health/readiness` returns `200` with the database up
+- [ ] **Pointed at a dead database port, readiness fails and liveness still passes**
+- [ ] Re-run the six SQL mechanism checks against the revised schema
+- [ ] `docker compose up --build` works end to end *(blocked: Docker not installed)*
+
+### Watch out
+
+Liveness must not include the `db` indicator. If it does, a database blip gets the
+container killed and restarted in a loop instead of just drained.
+
+---
+
+# PR 3 — Settings and identity
+
+**Branch** `impl/config-and-auth` · **Depends on** PR 2
+
+### Goal
+
+Policy values changeable without a redeploy, and identity that can only come from a
+signed token.
+
+### Files
+
+| File | Purpose |
+| --- | --- |
+| `config/ServiceConfigKeys.java` | key constants plus compile-time fallback defaults |
+| `config/ConfigSnapshot.java` | immutable record held in an `AtomicReference` |
+| `config/ServiceConfigRepository.java` | reads `service_config` |
+| `config/ServiceConfigService.java` | scheduled refresh, validation, last-good fallback |
+| `config/ConfigAdminController.java` | `GET` / `PUT` / `POST …/reload` |
+| `auth/AuthProperties.java` | JWT secret, TTL, admin secret — from env |
+| `auth/JwtService.java` | HS256 mint and verify |
+| `auth/AuthenticatedUser.java` | record `(id, handle, role)` |
+| `auth/CurrentUser.java` | per-request holder |
+| `auth/UserRepository.java` | find-or-create in `app_users` |
+| `auth/AuthFilter.java` | bearer parsing; writes `ErrorResponse` itself |
+| `auth/AuthController.java` | `POST /auth/token` |
+| `application.properties` | changed — JWT and admin secret bindings |
+
+### Commits
+
+```
+add service config reader with compile-time fallbacks
+add hot-reloaded config snapshot
+add config admin endpoints
+add jwt mint and verify
+add auth filter and current user resolution
+add dev token endpoint
+```
+
+### Tests
+
+| Test | Asserts |
+| --- | --- |
+| `JwtServiceTest` | round trip; tampered signature rejected; expired token rejected. **No database needed** |
+| `ServiceConfigServiceTest` | a bad value keeps the last-good snapshot and does not throw |
+
+### Acceptance
+
+- [ ] `POST /auth/token` returns a usable token
+- [ ] Missing / malformed / expired token → `401` in our own error shape
+- [ ] A `USER` token on an admin endpoint → `403`
+- [ ] `PUT /admin/config/reservation.per_user_limit` changes behaviour with no restart
+- [ ] A garbage config value logs `ERROR`, keeps the old value, and serves traffic
+- [ ] No config read happens inside a request
+
+### Watch out
+
+`AuthFilter` runs **outside** `@RestControllerAdvice`, so it must serialise
+`ErrorResponse` itself or auth failures will come back as Tomcat's HTML error page.
+
+---
+
+# PR 4 — Shows
+
+**Branch** `impl/shows` · **Depends on** PR 3
+
+### Goal
+
+Create a show with all its seats, and report its state so the reconciliation invariant
+is observable.
+
+### Files
+
+| File | Purpose |
+| --- | --- |
+| `show/ShowController.java` | `POST /shows`, `GET /shows/{id}` |
+| `show/ShowService.java` | validation, amount arithmetic |
+| `show/ShowRepository.java` | batched seat insert, single-query counts |
+| `show/dto/CreateShowRequest.java` | |
+| `show/dto/ShowResponse.java` | |
+| `show/dto/SeatView.java` | |
+
+### Commits
+
+```
+add show creation with batched seat insert
+add show state projection with single-query counts
+```
+
+### Tests
+
+| Test | Asserts |
+| --- | --- |
+| `ShowCreationTest` | 20,000 seats inserted in one batch; duplicate labels rejected `400`; `price_paise` negative rejected |
+| `ShowStateTest` | `available + held + confirmed == total_seats` on a fresh show; `?seats=false` agrees with the full response |
+
+### Acceptance
+
+- [ ] `POST /shows` as admin creates every seat in `AVAILABLE`
+- [ ] A non-admin token → `403`
+- [ ] A 20,000-seat show is created in **one batched insert**, not 20,000 round trips
+- [ ] `GET /shows/{id}` counts come from the same rows it returns
+- [ ] `held` is reported as `0`
+
+### Watch out
+
+Seat labels must be validated unique **before** insert, or the batch fails on the
+primary key with a confusing error partway through.
+
+---
+
+# PR 5 — The reservation engine
+
+**Branch** `impl/reservation-engine` · **Depends on** PR 4
+
+### Goal
+
+Every one of the assignment's six correctness bars, proven by a test that actually
+races threads.
+
+### Files
+
+| File | Purpose |
+| --- | --- |
+| `reservation/SeatRepository.java` | **the conditional UPDATE.** The file to read first |
+| `reservation/ReservationRepository.java` | |
+| `reservation/IdempotencyRepository.java` | insert-on-conflict, hash compare |
+| `reservation/UserShowLockRepository.java` | upsert then `FOR UPDATE` |
+| `reservation/ReservationService.java` | the nine steps, in order, in one method |
+| `reservation/ReservationController.java` | `POST …/reserve`, `POST …/cancel`, `GET …` |
+| `reservation/dto/ReserveRequest.java` | |
+| `reservation/dto/ReservationResponse.java` | |
+| `reservation/ReservationMetrics.java` | confirmed counter, declines by reason |
+
+### Commits
+
+```
+add seat acquisition with conditional update
+add user show lock and per-user limit check
+add idempotency key handling
+add reserve endpoint
+add cancel endpoint
+add decline metrics by reason
+add hot seat storm test
+add per-user limit concurrency test
+add idempotency concurrency tests
+add cancel and rebook test
+```
+
+### Tests — this is the point of the PR
+
+| Test | Setup | Asserts |
+| --- | --- | --- |
+| `HotSeatStormTest` | 500 threads, 500 users, one seat | **exactly one** `201`, 499 `409 seat_taken`, zero `5xx` |
+| `PerUserLimitTest` | 1 user, 10 parallel reserves, limit 4 | at most 4 seats owned; rest `409 per_user_limit` |
+| `IdempotentRetryTest` | same key fired 50× concurrently | one reservation exists; all callers get the same `reservation_id` |
+| `IdempotencyConflictTest` | same key, different seats | `409 idempotency_key_reuse` |
+| `MultiSeatAtomicityTest` | request `[A12, A13]` where `A13` is taken | `A12` still `AVAILABLE`; no partial booking |
+| `DeadlockFreeTest` | two users, reversed seat lists, many rounds | no `40P01`, no `5xx` |
+| `CancelRebookTest` | reserve → cancel → reserve same seat | second reserve succeeds; history row retained |
+| `CrossUserCancelTest` | user B cancels user A's booking | `404`; A's seats untouched |
+| `SpoofedIdentityTest` | body carries another `user_id` | booking belongs to the **token's** user |
+| `ReconciliationTest` | during and after a burst | `available + held + confirmed == total_seats` |
+
+### Acceptance
+
+Mapped directly to the assignment's stated bars:
+
+- [ ] **Bar 1** no seat confirmed twice — `HotSeatStormTest`
+- [ ] **Bar 2** zero `5xx` across the burst — asserted in every concurrency test
+- [ ] **Bar 3** reconciliation holds during and after — `ReconciliationTest`
+- [ ] **Bar 4** idempotent retries move nothing extra — `IdempotentRetryTest`
+- [ ] **Bar 5** per-user limit holds under concurrency — `PerUserLimitTest`
+- [ ] **Bar 6** identity is token-derived — `SpoofedIdentityTest`, `CrossUserCancelTest`
+
+### Watch out
+
+- `SET LOCAL lock_timeout = '1s'` must be inside the transaction, or a pathological
+  wait hangs a connection instead of becoming a `429`.
+- Seat labels must be sorted **before** the loop, not inside it.
+- The test suite needs Docker for Testcontainers. Fallback: honour
+  `TEST_DATABASE_URL` so these can run against local Postgres today.
+
+---
+
+# PR 6 — Deploy and observe
+
+**Branch** `impl/deploy-and-observe` · **Depends on** PR 5
+
+### Goal
+
+A live URL that survives a cold start, and enough instrumentation to watch it behaving
+correctly in real time.
+
+### Files
+
+| File | Purpose |
+| --- | --- |
+| `metrics/SeatGauges.java` | `seats_available` gauge, **queried on scrape**, 1s cache |
+| `src/main/resources/logback-spring.xml` | JSON logs with `request_id` |
+| `burst/main.go` | the load generator |
+| `burst.sh` | one-command wrapper |
+| `Makefile` | `make burst`, `make up`, `make test` |
+| `render.yaml` | Render blueprint |
+| `README.md` | changed — run, deploy, burst instructions |
+| `WRITEUP.md` | the required submission write-up |
+
+### Commits
+
+```
+add prometheus gauges backed by database queries
+add structured json logging with request id
+add burst script with hot seat storm
+add render blueprint
+add readme with run and burst instructions
+add writeup
+```
+
+### Metrics required by the assignment
+
+| Metric | Type | Note |
+| --- | --- | --- |
+| `reservations_confirmed_total` | counter | |
+| `reservations_declined_total{reason}` | counter | `seat_taken`, `per_user_limit`, `idempotent_replay` |
+| `seats_available{show_id}` | gauge | **derived from the database at scrape time**, not incremented in memory, so it always agrees with `GET /shows/{id}` |
+| `app_unexpected_errors_total` | counter | must stay at zero |
+| `app_requests_shed_total` | counter | the `429`s |
+
+### Acceptance
+
+- [ ] Public URL responds, and **survives a cold start** coming up healthy
+- [ ] `./burst.sh <URL>` runs from a clean clone and prints confirmed / declined-by-reason / `5xx` / reconciliation
+- [ ] Zero `5xx` across our own burst
+- [ ] Metrics reconcile with `GET /shows/{id}` to the unit
+- [ ] Logs carry a correlation id and are publicly viewable (or recorded)
+- [ ] `WRITEUP.md` covers all seven required topics, including honest AI-usage disclosure
+
+### Watch out
+
+- Render free tier is 0.1 CPU. Correct but slow, and slow produces `429`s. Budget $7
+  for the evaluation window.
+- Neon autosuspends; use the **pooled** connection string and verify the cold-start path
+  deliberately rather than discovering it when the graders do.
+
+---
+
+## What is blocking
+
+| Blocker | Blocks | Needed from |
+| --- | --- | --- |
+| Docker not installed | PR 2 compose check, PR 5 Testcontainers | `brew install --cask docker` |
+| Go not installed | PR 6 burst script | `brew install go` |
+| Neon project + pooled connection string | PR 6 deploy | you |
+| Render account linked to the repo | PR 6 deploy | you |
+
+None of these block PRs 2–5 from being written and verified against the local
+Postgres on port 5430.
+
+## Rough sizing
+
+| PR | Effort |
+| --- | --- |
+| 2 remaining | ~30 min |
+| 3 | ~1.5 h |
+| 4 | ~1 h |
+| 5 | ~3 h — most of it the tests |
+| 6 | ~2.5 h — deployment is where surprises live |
+
+Deployment goes first once PR 5 lands, not last. A live URL that is down is the single
+most common way a strong submission fails, and finding that out early is worth more
+than a polished write-up.
