@@ -561,5 +561,6 @@ chain, entry points, and overriding its own 401/403 rendering to match.
 4. Render's free tier gives a tenth of a CPU. Enough to be *correct* under the burst, but
    slow enough that latency may cause `429`s. Paying $7 for the evaluation window is
    cheap insurance.
-5. `V1__init.sql` as committed still has the three-state seat model. It needs reconciling
-   with this document on the `impl/scaffold-and-schema` branch.
+5. Whether `service_config` stays in the database or moves to
+   `application.properties` — a design review argued for the latter; kept in the
+   database as originally asked for.

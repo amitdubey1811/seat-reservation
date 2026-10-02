@@ -10,13 +10,13 @@
 --    no SELECT-then-UPDATE anywhere; the row lock is taken by the UPDATE itself, which
 --    is race-free at plain READ COMMITTED.
 --
---  * Hold expiry is evaluated lazily in that UPDATE's predicate
---    (status='HELD' AND hold_expires_at <= now()), so correctness never depends on a
---    sweeper having run. The sweeper only keeps gauges tidy.
+--  * A seat is AVAILABLE or CONFIRMED. There is no timed hold and no expiry sweeper:
+--    the spec allows either explicit cancellation or time-boxed holds, and we chose
+--    cancellation. One less state, no background job, no clock to reason about.
 --
 --  * user_show_locks deliberately stores no count. It is a mutex row; the authoritative
---    live-seat count for a user is read from `seats` inside that lock, so lazy expiry
---    cannot drift it out of agreement with the reconciliation invariant.
+--    seat count for a user is read from `seats` inside that lock, so there is no
+--    counter that can drift out of agreement with the reconciliation invariant.
 --
 --  * Lock order is global and acyclic:
 --      idempotency_keys (user-scoped) -> user_show_locks (user-scoped) -> seats (label ASC)
@@ -50,13 +50,9 @@ CREATE TABLE service_config (
 
 INSERT INTO service_config (key, value, description) VALUES
     ('reservation.per_user_limit',        '4',
-     'Max seats one user may hold or have confirmed for a single show. Global default; a show may override via shows.per_user_limit.'),
-    ('reservation.hold_ttl_seconds',      '120',
-     'Lifetime of a HELD seat before it lazily expires back to AVAILABLE.'),
+     'Max seats one user may have confirmed for a single show. Global default; a show may override via shows.per_user_limit.'),
     ('reservation.max_seats_per_request', '10',
      'Cap on seats in one reserve call. Bounds how many row locks a single transaction can hold.'),
-    ('expiry.sweeper_interval_seconds',   '15',
-     'How often expired holds are swept. Cosmetic only: expiry is enforced lazily in the acquisition predicate.'),
     ('idempotency.retention_hours',       '24',
      'How long completed idempotency keys remain replayable.');
 
@@ -74,35 +70,27 @@ CREATE TABLE shows (
 );
 
 CREATE TABLE seats (
-    show_id         UUID        NOT NULL REFERENCES shows (id) ON DELETE CASCADE,
-    label           TEXT        NOT NULL,
-    status          TEXT        NOT NULL DEFAULT 'AVAILABLE'
-                                CHECK (status IN ('AVAILABLE', 'HELD', 'CONFIRMED')),
-    held_by         UUID        REFERENCES app_users (id),
-    hold_expires_at TIMESTAMPTZ,
-    reservation_id  UUID,
-    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    show_id        UUID        NOT NULL REFERENCES shows (id) ON DELETE CASCADE,
+    label          TEXT        NOT NULL,
+    status         TEXT        NOT NULL DEFAULT 'AVAILABLE'
+                               CHECK (status IN ('AVAILABLE', 'CONFIRMED')),
+    owner_id       UUID        REFERENCES app_users (id),
+    reservation_id UUID,
+    updated_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
 
     PRIMARY KEY (show_id, label),
 
-    -- An incoherent seat row (held by nobody, confirmed with no reservation, available
-    -- but still carrying an owner) is rejected by the database rather than trusted to
-    -- application discipline.
+    -- An incoherent seat row (available but still carrying an owner, or confirmed with
+    -- no booking) is rejected by the database rather than trusted to application
+    -- discipline. If this ever fires we have a bug, and we want to hear about it.
     CONSTRAINT seats_state_coherent CHECK (
-        (status = 'AVAILABLE'
-            AND held_by IS NULL AND hold_expires_at IS NULL AND reservation_id IS NULL)
-     OR (status = 'HELD'
-            AND held_by IS NOT NULL AND hold_expires_at IS NOT NULL AND reservation_id IS NOT NULL)
-     OR (status = 'CONFIRMED'
-            AND held_by IS NOT NULL AND hold_expires_at IS NULL AND reservation_id IS NOT NULL)
+        (status = 'AVAILABLE' AND owner_id IS NULL     AND reservation_id IS NULL)
+     OR (status = 'CONFIRMED' AND owner_id IS NOT NULL AND reservation_id IS NOT NULL)
     )
 );
 
--- Supports the per-user live-seat count taken inside the quota mutex.
-CREATE INDEX seats_show_holder ON seats (show_id, held_by) WHERE held_by IS NOT NULL;
-
--- Supports the expiry sweeper.
-CREATE INDEX seats_expiring ON seats (hold_expires_at) WHERE status = 'HELD';
+-- Supports the per-user seat count taken inside the quota mutex.
+CREATE INDEX seats_show_owner ON seats (show_id, owner_id) WHERE owner_id IS NOT NULL;
 
 -- ---------------------------------------------------------------------------
 -- reservations
@@ -111,12 +99,10 @@ CREATE TABLE reservations (
     id           UUID        PRIMARY KEY,
     show_id      UUID        NOT NULL REFERENCES shows (id) ON DELETE CASCADE,
     user_id      UUID        NOT NULL REFERENCES app_users (id),
-    status       TEXT        NOT NULL
-                             CHECK (status IN ('HELD', 'CONFIRMED', 'CANCELLED', 'EXPIRED')),
+    status       TEXT        NOT NULL CHECK (status IN ('CONFIRMED', 'CANCELLED')),
     -- Integer minor units (paise). Never a float.
     amount_paise BIGINT      NOT NULL CHECK (amount_paise >= 0),
     seat_count   INT         NOT NULL CHECK (seat_count > 0),
-    expires_at   TIMESTAMPTZ,
     created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -166,17 +152,21 @@ CREATE TABLE user_show_locks (
 -- is written in the SAME transaction as the reservation, which is what makes the
 -- guarantee exactly-once rather than usually-once.
 -- ---------------------------------------------------------------------------
+-- There is deliberately no status column. The key row is written and completed inside
+-- one transaction, so another session sees either nothing at all or the finished row.
+-- "Half-written" is not observable, so we do not model it. (Verified with two live
+-- sessions: the second INSERT ... ON CONFLICT DO NOTHING waits, then reports 0 rows.)
+--
+-- There is also no stored response body. On replay we follow reservation_id and rebuild
+-- the answer from the booking itself, so there is one source of truth.
 CREATE TABLE idempotency_keys (
-    user_id         UUID        NOT NULL REFERENCES app_users (id),
-    idem_key        TEXT        NOT NULL,
+    user_id        UUID        NOT NULL REFERENCES app_users (id),
+    idem_key       TEXT        NOT NULL,
     -- Hash of the canonical request (show + sorted seats). A matching key with a
     -- different hash is a client bug and is rejected with 409.
-    request_hash    TEXT        NOT NULL,
-    status          TEXT        NOT NULL CHECK (status IN ('IN_PROGRESS', 'COMPLETED')),
-    response_status INT,
-    response_body   JSONB,
-    reservation_id  UUID        REFERENCES reservations (id) ON DELETE CASCADE,
-    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    request_hash   TEXT        NOT NULL,
+    reservation_id UUID        REFERENCES reservations (id) ON DELETE CASCADE,
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
 
     PRIMARY KEY (user_id, idem_key)
 );
