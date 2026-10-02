@@ -18,22 +18,29 @@ reservations, with zero 5xx.
   auth outcome maps to our own error taxonomy
 - **Testcontainers** for concurrency tests against a real Postgres
 
-## Package layout — package by layer
+## Package layout — package by entity (feature-sliced)
 
 ```
 com.amitdubey.seats
-  entity/        one @Entity per table, plus status enums
-  dto/           request and response shapes
-  repository/    Spring Data repositories, including the native atomic statements
-  service/       business logic and transaction boundaries
-  controller/    REST endpoints
+  seat/            Seat, SeatId, SeatStatus, SeatRepository, SeatService, SeatController, dto/
+  show/            Show, ShowRepository, ShowService, ShowController, dto/
+  reservation/      Reservation, ReservationStatus, ReservationSeat, ReservationSeatId,
+                    ReservationRepository, ReservationService, ReservationController, dto/
+  user/            AppUser, UserRole, UserRepository
+  idempotency/      IdempotencyKey, IdempotencyKeyId, IdempotencyKeyRepository
+  usershowlock/      UserShowLock, UserShowLockId, UserShowLockRepository
+  serviceconfig/     ServiceConfigEntry, ServiceConfigRepository, the hot-reloaded snapshot
+
   exception/     error taxonomy, ApiException, GlobalExceptionHandler, PgErrors
   filter/        request-id correlation filter, auth filter
   config/        Spring configuration and @ConfigurationProperties
   metrics/       counters and DB-backed gauges
 ```
 
-Layered, not feature-sliced. Keep each type in the package for its layer.
+Feature-sliced, not layered: an entity's class, its enums and id classes, and the
+repository/service/controller/dto that operate on it live together in one package.
+`exception/`, `filter/`, `config/`, and `metrics/` stay top-level because they are
+cross-cutting and not owned by any single entity.
 
 ## Non-negotiable invariants
 
