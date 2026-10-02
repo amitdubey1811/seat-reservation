@@ -69,7 +69,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleInvalidBody(MethodArgumentNotValidException e) {
         String detail = e.getBindingResult().getFieldErrors().stream()
-                .map(f -> f.getField() + " " + f.getDefaultMessage())
+                .map(f -> snakeCase(f.getField()) + ": " + f.getDefaultMessage())
                 .findFirst()
                 .orElse(ApiError.VALIDATION_FAILED.defaultMessage());
         return respond(ApiError.VALIDATION_FAILED, detail);
@@ -185,6 +185,15 @@ public class GlobalExceptionHandler {
                 .increment();
         log.error("unhandled exception sqlstate={}", PgErrors.sqlState(e), e);
         return respond(ApiError.INTERNAL, ApiError.INTERNAL.defaultMessage());
+    }
+
+    /**
+     * Java field names are camelCase; the API is snake_case. Reporting {@code pricePaise}
+     * when the caller sent {@code price_paise} makes them hunt for a field they never
+     * wrote. Array indices such as {@code seats[0]} are left intact.
+     */
+    private static String snakeCase(String field) {
+        return field.replaceAll("([a-z0-9])([A-Z])", "$1_$2").toLowerCase(java.util.Locale.ROOT);
     }
 
     private ResponseEntity<ErrorResponse> respond(ApiError error, String message) {
