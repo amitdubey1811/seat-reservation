@@ -6,6 +6,9 @@ import jakarta.persistence.Id;
 import jakarta.persistence.IdClass;
 import jakarta.persistence.Table;
 import java.util.UUID;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.NoArgsConstructor;
 
 /**
  * A mutex, and nothing else. <strong>It deliberately has no data columns.</strong>
@@ -27,6 +30,8 @@ import java.util.UUID;
 @Entity
 @Table(name = "user_show_locks")
 @IdClass(UserShowLockId.class)
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor
 public class UserShowLock {
 
     @Id
@@ -36,15 +41,6 @@ public class UserShowLock {
     @Id
     @Column(name = "show_id")
     private UUID showId;
-
-    /** Required by JPA. */
-    protected UserShowLock() {
-    }
-
-    public UserShowLock(UUID userId, UUID showId) {
-        this.userId = userId;
-        this.showId = showId;
-    }
 
     public UUID getUserId() {
         return userId;

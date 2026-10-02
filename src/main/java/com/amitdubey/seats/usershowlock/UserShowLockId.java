@@ -3,20 +3,17 @@ package com.amitdubey.seats.usershowlock;
 import java.io.Serializable;
 import java.util.Objects;
 import java.util.UUID;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.NoArgsConstructor;
 
 /** Composite key for {@link UserShowLock}. */
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor
 public class UserShowLockId implements Serializable {
 
     private UUID userId;
     private UUID showId;
-
-    protected UserShowLockId() {
-    }
-
-    public UserShowLockId(UUID userId, UUID showId) {
-        this.userId = userId;
-        this.showId = showId;
-    }
 
     public UUID getUserId() {
         return userId;

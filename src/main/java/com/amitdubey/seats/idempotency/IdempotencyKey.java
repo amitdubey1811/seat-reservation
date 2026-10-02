@@ -7,6 +7,9 @@ import jakarta.persistence.IdClass;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.NoArgsConstructor;
 
 /**
  * A request we have already answered.
@@ -26,6 +29,8 @@ import java.util.UUID;
 @Entity
 @Table(name = "idempotency_keys")
 @IdClass(IdempotencyKeyId.class)
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor
 public class IdempotencyKey {
 
     @Id
@@ -50,10 +55,6 @@ public class IdempotencyKey {
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
-
-    /** Required by JPA. */
-    protected IdempotencyKey() {
-    }
 
     public IdempotencyKey(UUID userId, String idemKey, String requestHash) {
         this.userId = userId;

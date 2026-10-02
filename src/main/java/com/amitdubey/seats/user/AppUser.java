@@ -8,6 +8,9 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.NoArgsConstructor;
 
 /**
  * A user. Created on demand by the token endpoint.
@@ -17,6 +20,8 @@ import java.util.UUID;
  */
 @Entity
 @Table(name = "app_users")
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor
 public class AppUser {
 
     @Id
@@ -31,10 +36,6 @@ public class AppUser {
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
-
-    /** Required by JPA. */
-    protected AppUser() {
-    }
 
     public AppUser(UUID id, String handle, UserRole role) {
         this.id = id;

@@ -3,23 +3,20 @@ package com.amitdubey.seats.seat;
 import java.io.Serializable;
 import java.util.Objects;
 import java.util.UUID;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.NoArgsConstructor;
 
 /**
  * Composite key for {@link Seat}. Field names must match the {@code @Id} fields on the
  * entity.
  */
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor
 public class SeatId implements Serializable {
 
     private UUID showId;
     private String label;
-
-    protected SeatId() {
-    }
-
-    public SeatId(UUID showId, String label) {
-        this.showId = showId;
-        this.label = label;
-    }
 
     public UUID getShowId() {
         return showId;

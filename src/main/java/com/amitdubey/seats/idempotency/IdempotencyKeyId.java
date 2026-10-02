@@ -3,6 +3,9 @@ package com.amitdubey.seats.idempotency;
 import java.io.Serializable;
 import java.util.Objects;
 import java.util.UUID;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.NoArgsConstructor;
 
 /**
  * Composite key for {@link IdempotencyKey}.
@@ -10,18 +13,12 @@ import java.util.UUID;
  * <p>Keys are scoped to the authenticated user, so two users may pick the same key
  * string without colliding. That scoping is part of the API contract.
  */
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor
 public class IdempotencyKeyId implements Serializable {
 
     private UUID userId;
     private String idemKey;
-
-    protected IdempotencyKeyId() {
-    }
-
-    public IdempotencyKeyId(UUID userId, String idemKey) {
-        this.userId = userId;
-        this.idemKey = idemKey;
-    }
 
     public UUID getUserId() {
         return userId;

@@ -5,6 +5,9 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.NoArgsConstructor;
 
 /**
  * One runtime-tunable policy setting.
@@ -19,6 +22,8 @@ import java.time.Instant;
  */
 @Entity
 @Table(name = "service_config")
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor
 public class ServiceConfigEntry {
 
     @Id
@@ -33,10 +38,6 @@ public class ServiceConfigEntry {
 
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
-
-    /** Required by JPA. */
-    protected ServiceConfigEntry() {
-    }
 
     public ServiceConfigEntry(String key, String value, String description) {
         this.key = key;

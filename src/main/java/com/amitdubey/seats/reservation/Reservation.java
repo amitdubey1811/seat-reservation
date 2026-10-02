@@ -8,6 +8,9 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.NoArgsConstructor;
 
 /**
  * One booking: a user, a show, and the seats recorded in {@link ReservationSeat}.
@@ -19,6 +22,8 @@ import java.util.UUID;
  */
 @Entity
 @Table(name = "reservations")
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor
 public class Reservation {
 
     @Id
@@ -45,10 +50,6 @@ public class Reservation {
 
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
-
-    /** Required by JPA. */
-    protected Reservation() {
-    }
 
     public Reservation(UUID id, UUID showId, UUID userId, long amountPaise, int seatCount) {
         this.id = id;

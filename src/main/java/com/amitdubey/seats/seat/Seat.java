@@ -9,6 +9,9 @@ import jakarta.persistence.IdClass;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.NoArgsConstructor;
 
 /**
  * One seat in one show. <strong>The source of truth for who owns what.</strong>
@@ -33,6 +36,8 @@ import java.util.UUID;
 @Entity
 @Table(name = "seats")
 @IdClass(SeatId.class)
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor
 public class Seat {
 
     @Id
@@ -57,10 +62,6 @@ public class Seat {
 
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
-
-    /** Required by JPA. */
-    protected Seat() {
-    }
 
     public Seat(UUID showId, String label) {
         this.showId = showId;

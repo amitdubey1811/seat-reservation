@@ -7,6 +7,9 @@ import jakarta.persistence.IdClass;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.NoArgsConstructor;
 
 /**
  * Which seat belonged to which booking, including bookings that have been cancelled.
@@ -24,6 +27,8 @@ import java.util.UUID;
 @Entity
 @Table(name = "reservation_seats")
 @IdClass(ReservationSeatId.class)
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor
 public class ReservationSeat {
 
     @Id
@@ -40,10 +45,6 @@ public class ReservationSeat {
     /** Null means this claim is live. */
     @Column(name = "released_at")
     private Instant releasedAt;
-
-    /** Required by JPA. */
-    protected ReservationSeat() {
-    }
 
     public ReservationSeat(UUID reservationId, UUID showId, String label) {
         this.reservationId = reservationId;

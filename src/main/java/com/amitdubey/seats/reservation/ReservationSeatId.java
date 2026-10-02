@@ -3,20 +3,17 @@ package com.amitdubey.seats.reservation;
 import java.io.Serializable;
 import java.util.Objects;
 import java.util.UUID;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.NoArgsConstructor;
 
 /** Composite key for {@link ReservationSeat}. */
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor
 public class ReservationSeatId implements Serializable {
 
     private UUID reservationId;
     private String label;
-
-    protected ReservationSeatId() {
-    }
-
-    public ReservationSeatId(UUID reservationId, String label) {
-        this.reservationId = reservationId;
-        this.label = label;
-    }
 
     public UUID getReservationId() {
         return reservationId;

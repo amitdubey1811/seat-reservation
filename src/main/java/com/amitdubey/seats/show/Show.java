@@ -6,6 +6,9 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.NoArgsConstructor;
 
 /**
  * An event with a fixed set of numbered seats.
@@ -15,6 +18,8 @@ import java.util.UUID;
  */
 @Entity
 @Table(name = "shows")
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor
 public class Show {
 
     @Id
@@ -35,10 +40,6 @@ public class Show {
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
-
-    /** Required by JPA. */
-    protected Show() {
-    }
 
     public Show(UUID id, String name, long pricePaise, int totalSeats, Integer perUserLimit) {
         this.id = id;
