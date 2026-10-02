@@ -1,4 +1,13 @@
 target/
+!.mvn/wrapper/maven-wrapper.jar
+
 .idea/
 *.iml
+*.iws
+*.ipr
+
 .DS_Store
+.env
+.env.local
+
+*.log
