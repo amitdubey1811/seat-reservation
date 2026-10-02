@@ -33,6 +33,11 @@ spring:
 
   jackson:
     default-property-inclusion: non_null
+    # The spec's payloads are snake_case (reservation_id, amount_paise, price_paise), so
+    # Java records stay camelCase and Jackson does the translation in one place.
+    property-naming-strategy: SNAKE_CASE
+    serialization:
+      write-dates-as-timestamps: false
 
 server:
   port: ${PORT:8080}
