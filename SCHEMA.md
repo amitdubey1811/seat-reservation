@@ -5,8 +5,8 @@ Every table, what writes it, and the exact order of statements each endpoint run
 [PLAN.md](PLAN.md) explains *why* the design is this shape. This document is the
 *what* and *when*.
 
-> This describes the target schema. `V1__init.sql` as committed still carries the
-> earlier three-state seat model and needs reconciling with this document.
+> `V1__init.sql` matches this document. The two-state model, the trimmed idempotency
+> table and the three config keys are all applied and verified against a real Postgres.
 
 ---
 
