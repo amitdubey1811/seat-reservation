@@ -10,10 +10,10 @@ Read [PLAN.md](PLAN.md) for the design and [SCHEMA.md](SCHEMA.md) for the data f
 
 | PR | Branch | Goal | State |
 | --- | --- | --- | --- |
-| 1 | `docs/implementation-plan` | Design documents | ✅ ready to merge |
-| 2 | `impl/scaffold-and-schema` | Project, schema, error handling | 🟡 5 of 7 commits done |
-| 3 | `impl/config-and-auth` | Settings snapshot, tokens, identity | ⬜ not started |
-| 4 | `impl/shows` | Create a show, report its state | ⬜ not started |
+| 1 | `docs/implementation-plan` | Design documents | ✅ merged |
+| 2 | `impl/scaffold-and-schema` | Project, schema, error handling | ✅ merged |
+| 3 | `impl/config-and-auth` | Settings snapshot, tokens, identity | ✅ merged |
+| 4 | `impl/shows` | Create a show, report its state | 🟡 implemented, not committed |
 | 5 | `impl/reservation-engine` | Reserve, cancel, concurrency tests | ⬜ not started |
 | 6 | `impl/deploy-and-observe` | Metrics, logs, burst script, deploy | ⬜ not started |
 
@@ -235,8 +235,13 @@ is observable.
 ### Commits
 
 ```
-add show creation with batched seat insert
-add show state projection with single-query counts
+add show and seat repositories with single-statement seat insert
+add show creation and state endpoints
+reject fractional money instead of truncating it
+report validation errors with snake_case field names
+add integration test harness for a real postgres
+add show creation and state tests
+document endpoints, tests and configuration
 ```
 
 ### Tests
@@ -248,11 +253,15 @@ add show state projection with single-query counts
 
 ### Acceptance
 
-- [ ] `POST /shows` as admin creates every seat in `AVAILABLE`
-- [ ] A non-admin token → `403`
-- [ ] A 20,000-seat show is created in **one batched insert**, not 20,000 round trips
-- [ ] `GET /shows/{id}` counts come from the same rows it returns
-- [ ] `held` is reported as `0`
+- [x] `POST /shows` as admin creates every seat in `AVAILABLE`
+- [x] A non-admin token → `403`, no token → `401`
+- [x] A 20,000-seat show is created in **one statement**, in 372 ms
+- [x] `GET /shows/{id}` counts come from the same rows it returns
+- [x] `?seats=false` agrees with the full listing exactly (212 B vs 757 KB)
+- [x] `held` is reported as `0`
+- [x] Fractional `price_paise` rejected rather than truncated — mutation-tested
+- [x] Duplicate labels, empty list, negative price, comma in a label → `400`
+- [x] Malformed show id → `400`, unknown show → `404`, never `5xx`
 
 ### Watch out
 
