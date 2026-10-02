@@ -1,4 +1,4 @@
-package com.amitdubey.seats.entity;
+package com.amitdubey.seats.reservation;
 
 import java.io.Serializable;
 import java.util.Objects;

@@ -1,4 +1,4 @@
-package com.amitdubey.seats.entity;
+package com.amitdubey.seats.idempotency;
 
 import java.io.Serializable;
 import java.util.Objects;

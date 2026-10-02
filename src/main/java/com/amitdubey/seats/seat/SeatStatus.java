@@ -1,4 +1,4 @@
-package com.amitdubey.seats.entity;
+package com.amitdubey.seats.seat;
 
 /**
  * The only two states a seat can be in.

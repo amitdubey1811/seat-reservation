@@ -1,4 +1,4 @@
-package com.amitdubey.seats.entity;
+package com.amitdubey.seats.usershowlock;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

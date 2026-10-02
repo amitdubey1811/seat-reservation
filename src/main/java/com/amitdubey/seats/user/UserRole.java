@@ -1,4 +1,4 @@
-package com.amitdubey.seats.entity;
+package com.amitdubey.seats.user;
 
 /** Stored as text in {@code app_users.role}. */
 public enum UserRole {
