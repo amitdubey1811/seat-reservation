@@ -1,4 +1,4 @@
-package com.amitdubey.seats.common;
+package com.amitdubey.seats.filter;
 
 import org.slf4j.MDC;
 

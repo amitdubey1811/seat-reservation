@@ -1,4 +1,4 @@
-package com.amitdubey.seats.common;
+package com.amitdubey.seats.exception;
 
 /**
  * Carries an {@link ApiError} to the exception handler.

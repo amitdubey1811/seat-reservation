@@ -8,25 +8,32 @@ reservations, with zero 5xx.
 ## Tech stack
 
 - **Java 21** + **Spring Boot 3.4.1**
-- **Plain JDBC** (`NamedParameterJdbcTemplate`) — **no JPA/Hibernate**. The hot path
-  needs exact, hand-written SQL; an ORM hides the statement that decides the race.
-- **PostgreSQL** + **Flyway** migrations
+- **Spring Data JPA / Hibernate** for ordinary persistence, with **native
+  `@Modifying` queries on the contended path**. The statement that decides a race is
+  always hand-written SQL returning a rows-affected count — never an ORM write.
+- **PostgreSQL** + **Flyway** migrations. Flyway owns the schema;
+  `ddl-auto=validate` makes Hibernate verify it agrees at boot.
 - **Micrometer/Actuator** for Prometheus metrics and health probes
 - **java-jwt** (HS256) behind a plain servlet filter — no Spring Security, so every
   auth outcome maps to our own error taxonomy
 - **Testcontainers** for concurrency tests against a real Postgres
 
-## Package layout — package by feature
+## Package layout — package by layer
 
 ```
 com.amitdubey.seats
-  config/        service_config table, hot-reloaded snapshot, admin config endpoints
-  auth/          JWT mint + verify filter, current-user resolution
-  show/          show creation, show state projection
-  reservation/   reserve / cancel / expiry, idempotency, seat acquisition SQL
-  common/        error taxonomy, exception handler, request-id filter
+  entity/        one @Entity per table, plus status enums
+  dto/           request and response shapes
+  repository/    Spring Data repositories, including the native atomic statements
+  service/       business logic and transaction boundaries
+  controller/    REST endpoints
+  exception/     error taxonomy, ApiException, GlobalExceptionHandler, PgErrors
+  filter/        request-id correlation filter, auth filter
+  config/        Spring configuration and @ConfigurationProperties
   metrics/       counters and DB-backed gauges
 ```
+
+Layered, not feature-sliced. Keep each type in the package for its layer.
 
 ## Non-negotiable invariants
 

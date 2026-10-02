@@ -415,15 +415,18 @@ in all but name, so pretending it is live-tunable would be dishonest.
 
 ## 12. Where the code lives
 
-One folder per feature.
+One folder per layer.
 
 ```
 src/main/java/com/amitdubey/seats/
-  common/        errors, request ids, the exception handler
-  config/        the service_config table and its in-memory snapshot
-  auth/          tokens in, user identity out
-  show/          creating a show, reporting its state
-  reservation/   ** reserve and cancel, and the SQL that decides **
+  entity/        one @Entity per table, plus status enums
+  dto/           request and response shapes
+  repository/    ** SeatRepository holds the SQL that decides **
+  service/       business logic, transaction boundaries
+  controller/    REST endpoints
+  exception/     errors, the taxonomy, the exception handler
+  filter/        request id, authentication
+  config/        Spring configuration
   metrics/       counters and gauges
 
 src/main/resources/
@@ -434,8 +437,18 @@ src/test/java/...               concurrency tests
 burst/                          the load script
 ```
 
-If you read two files, read `V1__init.sql` and the seat repository in `reservation/`.
+If you read two files, read `V1__init.sql` and `repository/SeatRepository.java`.
 Everything else is plumbing around them.
+
+**On JPA.** Ordinary reads and writes go through Spring Data. The contended path does
+not: seat acquisition, seat release, the per-user lock and the idempotency insert are
+all hand-written native statements, because the correctness argument depends on exactly
+which SQL runs and on reading its rows-affected count. Two settings make this safe:
+
+- `spring.jpa.open-in-view=false` — the default holds a database connection for the
+  whole request, which would exhaust the pool under a burst all by itself.
+- `spring.jpa.hibernate.ddl-auto=validate` — Flyway owns the schema, and Hibernate
+  checks the entities agree with it at startup rather than quietly diverging.
 
 ---
 

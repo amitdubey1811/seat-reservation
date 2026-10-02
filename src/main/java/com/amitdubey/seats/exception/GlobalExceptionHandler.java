@@ -1,5 +1,6 @@
-package com.amitdubey.seats.common;
+package com.amitdubey.seats.exception;
 
+import com.amitdubey.seats.filter.RequestId;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;

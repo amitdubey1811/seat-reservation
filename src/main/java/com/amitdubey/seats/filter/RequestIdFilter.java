@@ -1,4 +1,4 @@
-package com.amitdubey.seats.common;
+package com.amitdubey.seats.filter;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;

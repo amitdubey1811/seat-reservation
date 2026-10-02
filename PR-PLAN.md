@@ -89,12 +89,12 @@ domain outcome with a `5xx`.
 | `CLAUDE.md`, `.gitignore` | new |
 | `src/main/resources/application.properties` | new — pool, Flyway retries, actuator health groups |
 | `src/main/resources/db/migration/V1__init.sql` | new — the whole schema |
-| `common/ApiError.java` | new — the complete error taxonomy |
-| `common/ApiException.java` | new — stackless, thrown thousands of times a second |
-| `common/ErrorResponse.java` | new |
-| `common/GlobalExceptionHandler.java` | new |
-| `common/RequestIdFilter.java`, `common/RequestId.java` | new — correlation id into MDC |
-| `common/PgErrors.java` | new — SQLSTATE inspection |
+| `exception/ApiError.java` | new — the complete error taxonomy |
+| `exception/ApiException.java` | new — stackless, thrown thousands of times a second |
+| `exception/ErrorResponse.java` | new |
+| `exception/GlobalExceptionHandler.java` | new |
+| `filter/RequestIdFilter.java`, `filter/RequestId.java` | new — correlation id into MDC |
+| `exception/PgErrors.java` | new — SQLSTATE inspection |
 | `SeatReservationApplication.java` | new |
 
 ### Commits
@@ -105,7 +105,10 @@ domain outcome with a `5xx`.
 ✅ add error taxonomy, request id filter and exception handler
 ✅ use application.properties instead of yaml
 ✅ set hikari idle-timeout below max-lifetime
+✅ move error handling and filters into dedicated packages
 ⬜ simplify seat state to available and confirmed
+⬜ add jpa with flyway-owned schema
+⬜ add jpa entities mirroring the schema
 ⬜ split pool timeout from database unavailability
 ```
 
@@ -160,16 +163,16 @@ signed token.
 | --- | --- |
 | `config/ServiceConfigKeys.java` | key constants plus compile-time fallback defaults |
 | `config/ConfigSnapshot.java` | immutable record held in an `AtomicReference` |
-| `config/ServiceConfigRepository.java` | reads `service_config` |
-| `config/ServiceConfigService.java` | scheduled refresh, validation, last-good fallback |
-| `config/ConfigAdminController.java` | `GET` / `PUT` / `POST …/reload` |
-| `auth/AuthProperties.java` | JWT secret, TTL, admin secret — from env |
-| `auth/JwtService.java` | HS256 mint and verify |
-| `auth/AuthenticatedUser.java` | record `(id, handle, role)` |
-| `auth/CurrentUser.java` | per-request holder |
-| `auth/UserRepository.java` | find-or-create in `app_users` |
-| `auth/AuthFilter.java` | bearer parsing; writes `ErrorResponse` itself |
-| `auth/AuthController.java` | `POST /auth/token` |
+| `repository/ServiceConfigRepository.java` | reads `service_config` |
+| `service/ServiceConfigService.java` | scheduled refresh, validation, last-good fallback |
+| `controller/ConfigAdminController.java` | `GET` / `PUT` / `POST …/reload` |
+| `config/AuthProperties.java` | JWT secret, TTL, admin secret — from env |
+| `service/JwtService.java` | HS256 mint and verify |
+| `dto/AuthenticatedUser.java` | record `(id, handle, role)` |
+| `filter/CurrentUser.java` | per-request holder |
+| `repository/UserRepository.java` | find-or-create in `app_users` |
+| `filter/AuthFilter.java` | bearer parsing; writes `ErrorResponse` itself |
+| `controller/AuthController.java` | `POST /auth/token` |
 | `application.properties` | changed — JWT and admin secret bindings |
 
 ### Commits
@@ -219,12 +222,12 @@ is observable.
 
 | File | Purpose |
 | --- | --- |
-| `show/ShowController.java` | `POST /shows`, `GET /shows/{id}` |
-| `show/ShowService.java` | validation, amount arithmetic |
-| `show/ShowRepository.java` | batched seat insert, single-query counts |
-| `show/dto/CreateShowRequest.java` | |
-| `show/dto/ShowResponse.java` | |
-| `show/dto/SeatView.java` | |
+| `controller/ShowController.java` | `POST /shows`, `GET /shows/{id}` |
+| `service/ShowService.java` | validation, amount arithmetic |
+| `repository/ShowRepository.java` | batched seat insert, single-query counts |
+| `dto/CreateShowRequest.java` | |
+| `dto/ShowResponse.java` | |
+| `dto/SeatView.java` | |
 
 ### Commits
 
@@ -268,15 +271,15 @@ races threads.
 
 | File | Purpose |
 | --- | --- |
-| `reservation/SeatRepository.java` | **the conditional UPDATE.** The file to read first |
-| `reservation/ReservationRepository.java` | |
-| `reservation/IdempotencyRepository.java` | insert-on-conflict, hash compare |
-| `reservation/UserShowLockRepository.java` | upsert then `FOR UPDATE` |
-| `reservation/ReservationService.java` | the nine steps, in order, in one method |
-| `reservation/ReservationController.java` | `POST …/reserve`, `POST …/cancel`, `GET …` |
-| `reservation/dto/ReserveRequest.java` | |
-| `reservation/dto/ReservationResponse.java` | |
-| `reservation/ReservationMetrics.java` | confirmed counter, declines by reason |
+| `repository/SeatRepository.java` | **the conditional UPDATE.** The file to read first |
+| `repository/ReservationRepository.java` | |
+| `repository/IdempotencyRepository.java` | insert-on-conflict, hash compare |
+| `repository/UserShowLockRepository.java` | upsert then `FOR UPDATE` |
+| `service/ReservationService.java` | the nine steps, in order, in one method |
+| `controller/ReservationController.java` | `POST …/reserve`, `POST …/cancel`, `GET …` |
+| `dto/ReserveRequest.java` | |
+| `dto/ReservationResponse.java` | |
+| `metrics/ReservationMetrics.java` | confirmed counter, declines by reason |
 
 ### Commits
 

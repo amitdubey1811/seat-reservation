@@ -1,4 +1,4 @@
-package com.amitdubey.seats.common;
+package com.amitdubey.seats.exception;
 
 import java.sql.SQLException;
 import org.springframework.dao.DataAccessException;
