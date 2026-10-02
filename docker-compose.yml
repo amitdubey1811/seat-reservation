@@ -28,7 +28,7 @@ services:
       DATABASE_URL: jdbc:postgresql://db:5432/seats
       DATABASE_USER: seats
       DATABASE_PASSWORD: seats
-      JWT_SECRET: local-dev-secret-change-me
+      JWT_SECRET: local-development-signing-secret-not-for-production
       ADMIN_SECRET: local-admin-secret
       DB_POOL_SIZE: "24"
     ports:
