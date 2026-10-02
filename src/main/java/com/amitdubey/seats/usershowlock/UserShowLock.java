@@ -8,6 +8,7 @@ import jakarta.persistence.Table;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 /**
@@ -30,6 +31,7 @@ import lombok.NoArgsConstructor;
 @Entity
 @Table(name = "user_show_locks")
 @IdClass(UserShowLockId.class)
+@Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 public class UserShowLock {
@@ -41,12 +43,4 @@ public class UserShowLock {
     @Id
     @Column(name = "show_id")
     private UUID showId;
-
-    public UUID getUserId() {
-        return userId;
-    }
-
-    public UUID getShowId() {
-        return showId;
-    }
 }

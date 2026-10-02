@@ -9,6 +9,7 @@ import java.time.Instant;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 /**
@@ -27,6 +28,7 @@ import lombok.NoArgsConstructor;
 @Entity
 @Table(name = "reservation_seats")
 @IdClass(ReservationSeatId.class)
+@Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 public class ReservationSeat {
@@ -54,21 +56,5 @@ public class ReservationSeat {
 
     public boolean isLive() {
         return releasedAt == null;
-    }
-
-    public UUID getReservationId() {
-        return reservationId;
-    }
-
-    public String getLabel() {
-        return label;
-    }
-
-    public UUID getShowId() {
-        return showId;
-    }
-
-    public Instant getReleasedAt() {
-        return releasedAt;
     }
 }

@@ -5,6 +5,7 @@ import java.util.Objects;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 /**
@@ -13,20 +14,13 @@ import lombok.NoArgsConstructor;
  * <p>Keys are scoped to the authenticated user, so two users may pick the same key
  * string without colliding. That scoping is part of the API contract.
  */
+@Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 public class IdempotencyKeyId implements Serializable {
 
     private UUID userId;
     private String idemKey;
-
-    public UUID getUserId() {
-        return userId;
-    }
-
-    public String getIdemKey() {
-        return idemKey;
-    }
 
     @Override
     public boolean equals(Object o) {

@@ -11,6 +11,7 @@ import java.time.Instant;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 /**
@@ -36,6 +37,7 @@ import lombok.NoArgsConstructor;
 @Entity
 @Table(name = "seats")
 @IdClass(SeatId.class)
+@Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 public class Seat {
@@ -68,29 +70,5 @@ public class Seat {
         this.label = label;
         this.status = SeatStatus.AVAILABLE;
         this.updatedAt = Instant.now();
-    }
-
-    public UUID getShowId() {
-        return showId;
-    }
-
-    public String getLabel() {
-        return label;
-    }
-
-    public SeatStatus getStatus() {
-        return status;
-    }
-
-    public UUID getOwnerId() {
-        return ownerId;
-    }
-
-    public UUID getReservationId() {
-        return reservationId;
-    }
-
-    public Instant getUpdatedAt() {
-        return updatedAt;
     }
 }

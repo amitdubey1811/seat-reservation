@@ -8,7 +8,9 @@ import java.time.Instant;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 /**
  * An event with a fixed set of numbered seats.
@@ -18,10 +20,13 @@ import lombok.NoArgsConstructor;
  */
 @Entity
 @Table(name = "shows")
+@Getter
+@Setter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 public class Show {
 
+    @Setter(AccessLevel.NONE)
     @Id
     private UUID id;
 
@@ -48,29 +53,5 @@ public class Show {
         this.totalSeats = totalSeats;
         this.perUserLimit = perUserLimit;
         this.createdAt = Instant.now();
-    }
-
-    public UUID getId() {
-        return id;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public long getPricePaise() {
-        return pricePaise;
-    }
-
-    public int getTotalSeats() {
-        return totalSeats;
-    }
-
-    public Integer getPerUserLimit() {
-        return perUserLimit;
-    }
-
-    public Instant getCreatedAt() {
-        return createdAt;
     }
 }

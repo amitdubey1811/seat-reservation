@@ -10,7 +10,9 @@ import java.time.Instant;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 /**
  * One booking: a user, a show, and the seats recorded in {@link ReservationSeat}.
@@ -22,19 +24,26 @@ import lombok.NoArgsConstructor;
  */
 @Entity
 @Table(name = "reservations")
+@Getter
+@Setter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 public class Reservation {
 
+    @Setter(AccessLevel.NONE)
     @Id
     private UUID id;
 
+    @Setter(AccessLevel.NONE)
     @Column(name = "show_id", nullable = false)
     private UUID showId;
 
+    @Setter(AccessLevel.NONE)
     @Column(name = "user_id", nullable = false)
     private UUID userId;
 
+    /** Use {@link #cancel()} to transition this, not a setter. */
+    @Setter(AccessLevel.NONE)
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private ReservationStatus status;
@@ -74,37 +83,5 @@ public class Reservation {
 
     public boolean isOwnedBy(UUID candidate) {
         return userId.equals(candidate);
-    }
-
-    public UUID getId() {
-        return id;
-    }
-
-    public UUID getShowId() {
-        return showId;
-    }
-
-    public UUID getUserId() {
-        return userId;
-    }
-
-    public ReservationStatus getStatus() {
-        return status;
-    }
-
-    public long getAmountPaise() {
-        return amountPaise;
-    }
-
-    public int getSeatCount() {
-        return seatCount;
-    }
-
-    public Instant getCreatedAt() {
-        return createdAt;
-    }
-
-    public Instant getUpdatedAt() {
-        return updatedAt;
     }
 }

@@ -9,7 +9,9 @@ import java.time.Instant;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 /**
  * A request we have already answered.
@@ -29,14 +31,18 @@ import lombok.NoArgsConstructor;
 @Entity
 @Table(name = "idempotency_keys")
 @IdClass(IdempotencyKeyId.class)
+@Getter
+@Setter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 public class IdempotencyKey {
 
+    @Setter(AccessLevel.NONE)
     @Id
     @Column(name = "user_id")
     private UUID userId;
 
+    @Setter(AccessLevel.NONE)
     @Id
     @Column(name = "idem_key")
     private String idemKey;
@@ -44,8 +50,9 @@ public class IdempotencyKey {
     /**
      * Hash of the canonical request: show id plus the sorted seat labels. A matching key
      * carrying a different hash is a client bug, and is rejected with 409 rather than
-     * guessed at.
+     * guessed at. No setter: mutating it after creation would defeat that check.
      */
+    @Setter(AccessLevel.NONE)
     @Column(name = "request_hash", nullable = false)
     private String requestHash;
 
@@ -65,25 +72,5 @@ public class IdempotencyKey {
 
     public boolean matches(String candidateHash) {
         return requestHash.equals(candidateHash);
-    }
-
-    public UUID getUserId() {
-        return userId;
-    }
-
-    public String getIdemKey() {
-        return idemKey;
-    }
-
-    public String getRequestHash() {
-        return requestHash;
-    }
-
-    public UUID getReservationId() {
-        return reservationId;
-    }
-
-    public Instant getCreatedAt() {
-        return createdAt;
     }
 }

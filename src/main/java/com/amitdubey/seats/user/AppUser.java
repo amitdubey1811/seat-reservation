@@ -10,7 +10,9 @@ import java.time.Instant;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 /**
  * A user. Created on demand by the token endpoint.
@@ -20,10 +22,13 @@ import lombok.NoArgsConstructor;
  */
 @Entity
 @Table(name = "app_users")
+@Getter
+@Setter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 public class AppUser {
 
+    @Setter(AccessLevel.NONE)
     @Id
     private UUID id;
 
@@ -42,21 +47,5 @@ public class AppUser {
         this.handle = handle;
         this.role = role;
         this.createdAt = Instant.now();
-    }
-
-    public UUID getId() {
-        return id;
-    }
-
-    public String getHandle() {
-        return handle;
-    }
-
-    public UserRole getRole() {
-        return role;
-    }
-
-    public Instant getCreatedAt() {
-        return createdAt;
     }
 }

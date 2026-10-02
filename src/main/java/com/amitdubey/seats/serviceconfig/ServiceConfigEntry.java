@@ -7,7 +7,9 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 /**
  * One runtime-tunable policy setting.
@@ -22,14 +24,19 @@ import lombok.NoArgsConstructor;
  */
 @Entity
 @Table(name = "service_config")
+@Getter
+@Setter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 public class ServiceConfigEntry {
 
+    @Setter(AccessLevel.NONE)
     @Id
     @Column(name = "key")
     private String key;
 
+    /** Use {@link #setValue(String)}, not the Lombok setter: it also bumps {@code updatedAt}. */
+    @Setter(AccessLevel.NONE)
     @Column(name = "value", nullable = false)
     private String value;
 
@@ -49,21 +56,5 @@ public class ServiceConfigEntry {
     public void setValue(String value) {
         this.value = value;
         this.updatedAt = Instant.now();
-    }
-
-    public String getKey() {
-        return key;
-    }
-
-    public String getValue() {
-        return value;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public Instant getUpdatedAt() {
-        return updatedAt;
     }
 }

@@ -5,23 +5,17 @@ import java.util.Objects;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 /** Composite key for {@link UserShowLock}. */
+@Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 public class UserShowLockId implements Serializable {
 
     private UUID userId;
     private UUID showId;
-
-    public UUID getUserId() {
-        return userId;
-    }
-
-    public UUID getShowId() {
-        return showId;
-    }
 
     @Override
     public boolean equals(Object o) {
