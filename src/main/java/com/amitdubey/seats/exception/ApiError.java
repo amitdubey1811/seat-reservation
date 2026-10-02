@@ -31,6 +31,8 @@ public enum ApiError {
     SHOW_NOT_FOUND(HttpStatus.NOT_FOUND, "show_not_found", "No such show."),
     SEAT_UNKNOWN(HttpStatus.NOT_FOUND, "seat_unknown", "No such seat in this show."),
     RESERVATION_NOT_FOUND(HttpStatus.NOT_FOUND, "reservation_not_found", "No such reservation."),
+    CONFIG_KEY_UNKNOWN(HttpStatus.NOT_FOUND, "config_key_unknown",
+            "No such configuration key."),
 
     // --- request shape --------------------------------------------------------
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "validation_failed", "Request failed validation."),
