@@ -1,6 +1,7 @@
 package com.amitdubey.seats.exception;
 
 import java.sql.SQLException;
+import java.sql.SQLTransientConnectionException;
 import org.springframework.dao.DataAccessException;
 
 /**
@@ -38,6 +39,34 @@ public final class PgErrors {
 
     public static boolean isUniqueViolation(DataAccessException e) {
         return UNIQUE_VIOLATION.equals(sqlState(e));
+    }
+
+    /**
+     * True when the database itself could not be reached — SQLSTATE class 08, which
+     * covers connection_failure, connection_does_not_exist, and friends.
+     *
+     * <p>This is what separates "the pool is busy" (our problem, a 429) from "Postgres
+     * is gone" (a dependency problem, a 503). Hikari reports a pool timeout as a
+     * {@code SQLTransientConnectionException}, and it copies the underlying SQLSTATE
+     * onto it when the timeout was caused by a failure to connect — so this check must
+     * be made <em>before</em> concluding that a timeout was mere saturation.
+     */
+    public static boolean isConnectionFailure(Throwable t) {
+        String state = sqlState(t);
+        return state != null && state.startsWith("08");
+    }
+
+    /** True when the cause chain contains a Hikari pool-timeout exception. */
+    public static boolean isPoolTimeout(Throwable t) {
+        for (Throwable c = t; c != null; c = c.getCause()) {
+            if (c instanceof SQLTransientConnectionException) {
+                return true;
+            }
+            if (c.getCause() == c) {
+                break;
+            }
+        }
+        return false;
     }
 
     /**

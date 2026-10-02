@@ -6,11 +6,11 @@ import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.TransientDataAccessException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
-import org.springframework.jdbc.CannotGetJdbcConnectionException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -103,14 +103,51 @@ public class GlobalExceptionHandler {
     // --- saturation and contention -----------------------------------------
 
     /**
-     * Hikari could not hand out a connection within {@code connection-timeout}. Spring's
-     * default would be a 503; a 429 with Retry-After is both truthful and inside the bar.
+     * We could not obtain a connection. Two very different causes hide behind the same
+     * exception type, and they deserve different answers:
+     *
+     * <ul>
+     *   <li><strong>The pool was busy</strong> under load but Postgres is healthy. That
+     *       is a 429: we declined to decide right now. Spring's default would be a 503,
+     *       which is a 5xx and would fail the zero-5xx bar during a burst.</li>
+     *   <li><strong>Postgres is unreachable</strong> (SQLSTATE class 08). That is a 503.
+     *       Dressing a dead dependency up as "too many requests" would be dishonest,
+     *       and readiness is already failing, so traffic should be draining away.</li>
+     * </ul>
+     *
+     * <p>The connection-failure check comes first on purpose: Hikari copies the
+     * underlying SQLSTATE onto its timeout exception when the timeout was itself caused
+     * by a failure to connect, so a naive "timeout means saturation" reading would
+     * misreport an outage as load.
      */
-    @ExceptionHandler(CannotGetJdbcConnectionException.class)
-    public ResponseEntity<ErrorResponse> handlePoolExhausted(CannotGetJdbcConnectionException e) {
+    @ExceptionHandler(DataAccessResourceFailureException.class)
+    public ResponseEntity<ErrorResponse> handleNoConnection(DataAccessResourceFailureException e) {
+        if (PgErrors.isConnectionFailure(e)) {
+            log.error("database unreachable sqlstate={}", PgErrors.sqlState(e));
+            return respond(ApiError.DEPENDENCY_UNAVAILABLE,
+                    ApiError.DEPENDENCY_UNAVAILABLE.defaultMessage());
+        }
+        if (PgErrors.isPoolTimeout(e)) {
+            shed.increment();
+            log.warn("shedding request: no database connection available within pool timeout");
+            return respond(ApiError.BUSY, "Service saturated: no database connection available.");
+        }
+        log.error("could not obtain a database connection sqlstate={}", PgErrors.sqlState(e), e);
+        return respond(ApiError.DEPENDENCY_UNAVAILABLE,
+                ApiError.DEPENDENCY_UNAVAILABLE.defaultMessage());
+    }
+
+    /**
+     * JPA's own lock and timeout exceptions, in case one escapes before Spring's
+     * exception translation has wrapped it.
+     */
+    @ExceptionHandler({jakarta.persistence.LockTimeoutException.class,
+                       jakarta.persistence.PessimisticLockException.class,
+                       jakarta.persistence.QueryTimeoutException.class})
+    public ResponseEntity<ErrorResponse> handleJpaContention(RuntimeException e) {
         shed.increment();
-        log.warn("shedding request: no database connection available within pool timeout");
-        return respond(ApiError.BUSY, "Service saturated: no database connection available.");
+        log.warn("shedding request: jpa reported contention ({})", e.getClass().getSimpleName());
+        return respond(ApiError.BUSY, ApiError.BUSY.defaultMessage());
     }
 
     /** Lock timeout, deadlock, serialization failure, statement timeout. */

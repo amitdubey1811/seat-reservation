@@ -83,12 +83,13 @@ domain outcome with a `5xx`.
 
 | File | New / changed |
 | --- | --- |
-| `pom.xml` | new — Spring Boot 3.4.1, JDBC, Flyway, Actuator, java-jwt, Testcontainers |
+| `pom.xml` | new — Spring Boot 3.4.1, Data JPA, Flyway, Actuator, java-jwt, Testcontainers |
 | `Dockerfile` | new — multi-stage, non-root, `MaxRAMPercentage=70` |
 | `docker-compose.yml` | new — healthchecked Postgres 17 + app |
 | `CLAUDE.md`, `.gitignore` | new |
 | `src/main/resources/application.properties` | new — pool, Flyway retries, actuator health groups |
 | `src/main/resources/db/migration/V1__init.sql` | new — the whole schema |
+| `entity/` — 15 files | new — 8 `@Entity` classes, 4 composite-key classes, 3 enums |
 | `exception/ApiError.java` | new — the complete error taxonomy |
 | `exception/ApiException.java` | new — stackless, thrown thousands of times a second |
 | `exception/ErrorResponse.java` | new |
@@ -106,10 +107,10 @@ domain outcome with a `5xx`.
 ✅ use application.properties instead of yaml
 ✅ set hikari idle-timeout below max-lifetime
 ✅ move error handling and filters into dedicated packages
-⬜ simplify seat state to available and confirmed
-⬜ add jpa with flyway-owned schema
-⬜ add jpa entities mirroring the schema
-⬜ split pool timeout from database unavailability
+✅ simplify seat state to available and confirmed
+✅ add jpa with flyway-owned schema
+✅ add jpa entities mirroring the schema
+✅ split pool timeout from database unavailability
 ```
 
 ### Remaining work
@@ -133,12 +134,14 @@ nothing is pushed and a fresh clone should see one clean schema.
 
 ### Acceptance
 
-- [ ] `mvn -DskipTests package` succeeds on JDK 21
-- [ ] Flyway applies cleanly to an empty database
-- [ ] App boots; `/actuator/health/liveness` returns `200`
-- [ ] `/actuator/health/readiness` returns `200` with the database up
-- [ ] **Pointed at a dead database port, readiness fails and liveness still passes**
-- [ ] Re-run the six SQL mechanism checks against the revised schema
+- [x] `mvn -DskipTests package` succeeds on JDK 21
+- [x] Flyway applies cleanly to an empty database
+- [x] App boots; `/actuator/health/liveness` returns `200`
+- [x] `/actuator/health/readiness` returns `200` with the database up
+- [x] **Database killed after boot: readiness `503` (`db: DOWN`), liveness still `200`**
+- [x] Seven SQL mechanism checks pass against the revised schema, including
+      cancel-then-rebook with history retained
+- [x] `ddl-auto=validate` proven to reject a deliberate entity/schema mismatch
 - [ ] `docker compose up --build` works end to end *(blocked: Docker not installed)*
 
 ### Watch out

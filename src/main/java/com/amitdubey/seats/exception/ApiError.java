@@ -22,8 +22,10 @@ public enum ApiError {
     // --- idempotency ----------------------------------------------------------
     IDEMPOTENCY_KEY_REUSE(HttpStatus.CONFLICT, "idempotency_key_reuse",
             "This idempotency key was already used with a different request body."),
-    REQUEST_IN_PROGRESS(HttpStatus.CONFLICT, "request_in_progress",
-            "A request with this idempotency key is still in flight."),
+    // There is no "request in progress" outcome. The key row is written and completed
+    // inside one transaction, so a concurrent duplicate either sees nothing or sees the
+    // finished row — it waits on the insert and then replays. Verified with two live
+    // sessions; see IdempotencyKey.
 
     // --- lookup ---------------------------------------------------------------
     SHOW_NOT_FOUND(HttpStatus.NOT_FOUND, "show_not_found", "No such show."),
@@ -49,8 +51,18 @@ public enum ApiError {
     FORBIDDEN(HttpStatus.FORBIDDEN, "forbidden", "This token may not perform that action."),
 
     // --- load shedding --------------------------------------------------------
+    // We could not decide right now, but the database is healthy: the pool was busy or a
+    // row was contended. A 4xx is the honest answer — we declined to decide, we did not
+    // decline the booking on its merits.
     BUSY(HttpStatus.TOO_MANY_REQUESTS, "busy",
             "The service is saturated or the row is contended; retry shortly."),
+
+    // --- dependency down ------------------------------------------------------
+    // The database is unreachable. This is NOT dressed up as a 429: calling a dead
+    // dependency "too many requests" would be a lie, and readiness is failing too, so
+    // the platform should already be routing traffic away from us.
+    DEPENDENCY_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "dependency_unavailable",
+            "A dependency is unavailable; the service cannot serve requests right now."),
 
     // --- genuine bug ----------------------------------------------------------
     INTERNAL(HttpStatus.INTERNAL_SERVER_ERROR, "internal_error", "Unexpected server error.");
