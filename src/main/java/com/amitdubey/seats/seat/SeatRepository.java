@@ -118,6 +118,31 @@ public interface SeatRepository extends JpaRepository<Seat, SeatId> {
     long countOwnedBy(@Param("showId") UUID showId, @Param("userId") UUID userId);
 
     /**
+     * Seat counts for every show, in one statement, for the metrics gauges.
+     *
+     * <p>Joined against {@code shows} so the gauge can carry the show's declared
+     * {@code total_seats} alongside what the seat rows actually say. Publishing both lets
+     * the reconciliation invariant be checked from the metrics endpoint alone, without
+     * anyone having to call the API and compare by hand.
+     *
+     * <p>Bounded by {@code limit}: each show becomes its own time series, and an unbounded
+     * label is how a metrics backend quietly falls over.
+     */
+    @Query(value = """
+            SELECT sh.id          AS show_id,
+                   sh.name        AS show_name,
+                   sh.total_seats AS total_seats,
+                   count(*) FILTER (WHERE s.status = 'AVAILABLE') AS available,
+                   count(*) FILTER (WHERE s.status = 'CONFIRMED') AS confirmed
+              FROM shows sh
+              JOIN seats s ON s.show_id = sh.id
+             GROUP BY sh.id, sh.name, sh.total_seats, sh.created_at
+             ORDER BY sh.created_at DESC
+             LIMIT :limit
+            """, nativeQuery = true)
+    List<ShowSeatCountsView> countsByShow(@Param("limit") int limit);
+
+    /**
      * Distinguishes "that seat is taken" from "there is no such seat".
      *
      * <p>Only ever called after {@link #acquire} returned zero, so the happy path stays a

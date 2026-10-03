@@ -143,7 +143,7 @@ class PerUserLimitTest extends IntegrationTest {
     @Test
     @DisplayName("a per-show override replaces the global limit")
     void aShowMayRaiseItsOwnLimit() {
-        jdbc.update("UPDATE service_config SET value = '2' WHERE key = 'reservation.per_user_limit'");
+        setConfig("reservation.per_user_limit", "2");
 
         ShowResponse show = api.createShowRaw(api.adminToken("root"),
                 new com.amitdubey.seats.show.dto.CreateShowRequest(

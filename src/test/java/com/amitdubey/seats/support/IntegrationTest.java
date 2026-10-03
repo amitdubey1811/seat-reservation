@@ -76,6 +76,9 @@ public abstract class IntegrationTest {
     protected io.micrometer.core.instrument.MeterRegistry meters;
 
     @Autowired
+    protected com.amitdubey.seats.serviceconfig.ServiceConfigService serviceConfig;
+
+    @Autowired
     private com.amitdubey.seats.config.AuthProperties authProperties;
 
     protected ApiClient api;
@@ -95,6 +98,22 @@ public abstract class IntegrationTest {
                 """);
         jdbc.update("UPDATE service_config SET value = '4' WHERE key = 'reservation.per_user_limit'");
         jdbc.update("UPDATE service_config SET value = '10' WHERE key = 'reservation.max_seats_per_request'");
+
+        // Reload the snapshot synchronously. Resetting only the row leaves the service
+        // running on whatever the previous test put in memory until the next scheduled
+        // refresh — so tests would race the tick and fail in whichever order ran them
+        // unluckily. The asynchronous refresh is correct in production and wrong to depend
+        // on in a test.
+        serviceConfig.refresh();
+    }
+
+    /**
+     * Changes a policy setting and makes it effective immediately, rather than leaving the
+     * test to hope the scheduled refresh has fired.
+     */
+    protected void setConfig(String key, String value) {
+        jdbc.update("UPDATE service_config SET value = ? WHERE key = ?", value, key);
+        serviceConfig.refresh();
     }
 
     /**

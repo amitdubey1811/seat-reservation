@@ -134,11 +134,7 @@ class MultiSeatTest extends IntegrationTest {
     @Test
     @DisplayName("more seats than the configured cap is refused")
     void exceedingTheRequestCapIsRejected() {
-        jdbc.update("UPDATE service_config SET value = '3' "
-                + "WHERE key = 'reservation.max_seats_per_request'");
-        // The snapshot refreshes on a schedule; force it so the test is not timing-dependent.
-        http.postForEntity("/admin/config/reload", new org.springframework.http.HttpEntity<>(
-                null, api.bearer(api.adminToken("root"))), String.class);
+        setConfig("reservation.max_seats_per_request", "3");
 
         ShowResponse show = api.createShowRaw(api.adminToken("root"),
                 new com.amitdubey.seats.show.dto.CreateShowRequest("cap", labels(20), 500L, 10),
