@@ -1,0 +1,59 @@
+# Render blueprint — the deployment config lives next to the thing it deploys, so it can
+# be reviewed and reproduced rather than clicked into a dashboard nobody can see.
+#
+# Apply with: Render → New → Blueprint → pick this repo.
+
+services:
+  - type: web
+    name: seat-reservation
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+
+    # Must match the database's region. Measured from outside it, a single statement to
+    # Singapore costs ~66 ms, and a reservation is nine statements — about 1.2 s per
+    # booking. In-region that same transaction is ~20 ms. Putting the app anywhere else
+    # would wreck the burst for reasons that have nothing to do with the code.
+    region: singapore
+
+    plan: free
+
+    # Readiness, deliberately — not liveness. Readiness checks the database, so when the
+    # database is unreachable Render stops routing traffic here instead of sending
+    # requests to an instance that can only fail them. Liveness ignores the database on
+    # purpose: a blip should drain traffic, not trigger a restart loop.
+    healthCheckPath: /actuator/health/readiness
+
+    autoDeploy: true
+
+    envVars:
+      # --- secrets ---------------------------------------------------------------------
+      # `sync: false` means the value is NOT in this file. Render prompts for it once and
+      # stores it encrypted. Hardcoding any of these would publish a live credential in a
+      # public repository.
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_USER
+        sync: false
+      - key: DATABASE_PASSWORD
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: ADMIN_SECRET
+        sync: false
+
+      # --- tuning ----------------------------------------------------------------------
+      # Lower than the local default of 24. On a 0.1-CPU instance the processor saturates
+      # long before the pool does, so extra connections buy only context switching.
+      - key: DB_POOL_SIZE
+        value: "10"
+
+      # Size the heap from the container's limit, not the host's. Without this a JVM in a
+      # 512 MB container can size a heap for the whole machine and get OOM-killed.
+      # ExitOnOutOfMemoryError makes the container die loudly so Render restarts it,
+      # rather than limping along half-broken.
+      - key: JAVA_OPTS
+        value: "-XX:MaxRAMPercentage=70.0 -XX:+ExitOnOutOfMemoryError"
+
+      # Free instances sleep after ~15 minutes idle, and Neon scales to zero alongside
+      # them, so the first request after a quiet spell wakes both. Flyway retries its
+      # initial connection (see application.properties) precisely for that path.
