@@ -11,6 +11,7 @@ import org.springframework.dao.TransientDataAccessException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -122,6 +123,36 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(DataAccessResourceFailureException.class)
     public ResponseEntity<ErrorResponse> handleNoConnection(DataAccessResourceFailureException e) {
+        return classifyConnectionProblem(e);
+    }
+
+    /**
+     * The same failure, arriving by a different route.
+     *
+     * <p>When a transaction cannot start because the pool has no connection to give,
+     * {@code JpaTransactionManager} wraps it in a {@link CannotCreateTransactionException} —
+     * which extends {@code TransactionException}, <strong>not</strong>
+     * {@code DataAccessException}. So it bypasses the handler above entirely and, without
+     * this, falls through to the catch-all as a 500.
+     *
+     * <p>Found by running a burst against the deployed service, not by the test suite:
+     * unit tests never exhaust a connection pool, so this path had never once been taken.
+     * It produced 47 server errors on a saturated instance while the shed counter stayed
+     * at zero — the taxonomy quietly had a hole in exactly the case it was built for.
+     */
+    @ExceptionHandler(CannotCreateTransactionException.class)
+    public ResponseEntity<ErrorResponse> handleNoTransaction(CannotCreateTransactionException e) {
+        return classifyConnectionProblem(e);
+    }
+
+    /**
+     * Saturation is a 429; an unreachable database is a 503.
+     *
+     * <p>The connection-failure check runs first on purpose: Hikari copies the underlying
+     * SQLSTATE onto its timeout exception when the timeout was itself caused by a failure to
+     * connect, so reading "timeout" as "saturation" would misreport an outage as load.
+     */
+    private ResponseEntity<ErrorResponse> classifyConnectionProblem(Exception e) {
         if (PgErrors.isConnectionFailure(e)) {
             log.error("database unreachable sqlstate={}", PgErrors.sqlState(e));
             return respond(ApiError.DEPENDENCY_UNAVAILABLE,
