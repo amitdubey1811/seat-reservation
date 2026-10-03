@@ -6,7 +6,8 @@ services:
       POSTGRES_USER: seats
       POSTGRES_PASSWORD: seats
     ports:
-      - "5432:5432"
+      # Overridable: a developer may already have Postgres on 5432.
+      - "${DB_PORT:-5432}:5432"
     command:
       - postgres
       - -c
@@ -32,7 +33,7 @@ services:
       ADMIN_SECRET: local-admin-secret
       DB_POOL_SIZE: "24"
     ports:
-      - "8080:8080"
+      - "${APP_PORT:-8080}:8080"
 
 volumes:
   db-data:
