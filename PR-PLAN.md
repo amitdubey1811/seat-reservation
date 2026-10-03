@@ -13,8 +13,8 @@ Read [PLAN.md](PLAN.md) for the design and [SCHEMA.md](SCHEMA.md) for the data f
 | 1 | `docs/implementation-plan` | Design documents | ✅ merged |
 | 2 | `impl/scaffold-and-schema` | Project, schema, error handling | ✅ merged |
 | 3 | `impl/config-and-auth` | Settings snapshot, tokens, identity | ✅ merged |
-| 4 | `impl/shows` | Create a show, report its state | 🟡 implemented, not committed |
-| 5 | `impl/reservation-engine` | Reserve, cancel, concurrency tests | ⬜ not started |
+| 4 | `impl/shows` | Create a show, report its state | ✅ merged |
+| 5 | `impl/reservation-engine` | Reserve, cancel, concurrency tests | 🟡 implemented and tested, not committed |
 | 6 | `impl/deploy-and-observe` | Metrics, logs, burst script, deploy | ⬜ not started |
 
 ## Ground rules for every PR
@@ -296,16 +296,16 @@ races threads.
 ### Commits
 
 ```
-add seat acquisition with conditional update
-add user show lock and per-user limit check
-add idempotency key handling
-add reserve endpoint
-add cancel endpoint
-add decline metrics by reason
-add hot seat storm test
-add per-user limit concurrency test
-add idempotency concurrency tests
-add cancel and rebook test
+add conditional-update seat acquisition and release
+add user lock, idempotency and reservation seat repositories
+add reservation service with ordered lock acquisition
+add reserve, cancel and read endpoints
+add reservation metrics with declines by reason
+map the unique-index backstop to a clean decline
+add concurrency burst harness
+add hot seat storm and reconciliation tests
+add per-user limit, idempotency, multi-seat and identity tests
+raise testcontainers for docker engine 29 compatibility
 ```
 
 ### Tests — this is the point of the PR
@@ -327,12 +327,15 @@ add cancel and rebook test
 
 Mapped directly to the assignment's stated bars:
 
-- [ ] **Bar 1** no seat confirmed twice — `HotSeatStormTest`
-- [ ] **Bar 2** zero `5xx` across the burst — asserted in every concurrency test
-- [ ] **Bar 3** reconciliation holds during and after — `ReconciliationTest`
-- [ ] **Bar 4** idempotent retries move nothing extra — `IdempotentRetryTest`
-- [ ] **Bar 5** per-user limit holds under concurrency — `PerUserLimitTest`
-- [ ] **Bar 6** identity is token-derived — `SpoofedIdentityTest`, `CrossUserCancelTest`
+- [x] **Bar 1** no seat confirmed twice — 300 buyers, one seat, `1×201 / 299×409`
+- [x] **Bar 2** zero `5xx` across the burst — asserted in every concurrency test
+- [x] **Bar 3** reconciliation holds during and after — `reconciled: true` post-storm
+- [x] **Bar 4** idempotent retries move nothing extra — 50 concurrent copies, one booking
+- [x] **Bar 5** per-user limit holds under concurrency — 10 parallel on limit 4 → 4
+- [x] **Bar 6** identity is token-derived — spoofed `user_id` ignored entirely
+- [x] 75 tests green via **Testcontainers with no environment configuration**
+- [x] Mutation-tested: removing the acquisition guard, and removing the per-user lock,
+      each make the suite fail
 
 ### Watch out
 

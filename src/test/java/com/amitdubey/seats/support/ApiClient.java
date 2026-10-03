@@ -3,6 +3,8 @@ package com.amitdubey.seats.support;
 import com.amitdubey.seats.auth.dto.TokenRequest;
 import com.amitdubey.seats.auth.dto.TokenResponse;
 import com.amitdubey.seats.config.AuthProperties;
+import com.amitdubey.seats.reservation.dto.ReservationResponse;
+import com.amitdubey.seats.reservation.dto.ReserveRequest;
 import com.amitdubey.seats.show.dto.CreateShowRequest;
 import com.amitdubey.seats.show.dto.ShowResponse;
 import java.util.List;
@@ -78,5 +80,36 @@ public class ApiClient {
 
     public ResponseEntity<ShowResponse> getShowCountsOnly(String showId) {
         return http.getForEntity("/shows/" + showId + "?seats=false", ShowResponse.class);
+    }
+
+    // --- reservations -------------------------------------------------------------------
+
+    public <T> ResponseEntity<T> reserve(String token, String showId, List<String> seats,
+                                         String idempotencyKey, Class<T> type) {
+        return http.exchange("/shows/" + showId + "/reserve", HttpMethod.POST,
+                new HttpEntity<>(new ReserveRequest(seats, idempotencyKey), bearer(token)), type);
+    }
+
+    /** Reserve with an arbitrary body, for probing what the service ignores or rejects. */
+    public <T> ResponseEntity<T> reserveRaw(String token, String showId, Object body,
+                                            Class<T> type) {
+        return http.exchange("/shows/" + showId + "/reserve", HttpMethod.POST,
+                new HttpEntity<>(body, bearer(token)), type);
+    }
+
+    public ResponseEntity<ReservationResponse> cancel(String token, String reservationId) {
+        return http.exchange("/reservations/" + reservationId + "/cancel", HttpMethod.POST,
+                new HttpEntity<>(null, bearer(token)), ReservationResponse.class);
+    }
+
+    public <T> ResponseEntity<T> cancelRaw(String token, String reservationId, Class<T> type) {
+        return http.exchange("/reservations/" + reservationId + "/cancel", HttpMethod.POST,
+                new HttpEntity<>(null, bearer(token)), type);
+    }
+
+    public <T> ResponseEntity<T> getReservation(String token, String reservationId,
+                                                Class<T> type) {
+        return http.exchange("/reservations/" + reservationId, HttpMethod.GET,
+                new HttpEntity<>(null, bearer(token)), type);
     }
 }
