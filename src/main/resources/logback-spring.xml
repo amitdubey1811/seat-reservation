@@ -67,4 +67,19 @@
     <logger name="org.hibernate.orm.connections.pooling" level="WARN"/>
     <logger name="org.springframework.orm.jpa" level="WARN"/>
 
+    <!--
+      Hibernate logs every SQLException at ERROR before our handler has decided what it
+      means. For a pool timeout that is actively misleading: the request is shed as a
+      deliberate 429, and GlobalExceptionHandler already logs it at WARN with the request
+      id. Left on, a burst that the service handled correctly fills the error log with
+      hundreds of ERROR lines, and anyone alerting on error rate would be paged for the
+      system working as designed.
+
+      Set to OFF rather than WARN because the level governs this logger's own output, and
+      the problem is specifically its ERROR line. Nothing is lost: every failure still
+      reaches our exception handler, which logs it with a correlation id and the status it
+      actually produced, and genuine defects are counted by app_unexpected_errors_total.
+    -->
+    <logger name="org.hibernate.engine.jdbc.spi.SqlExceptionHelper" level="OFF"/>
+
 </configuration>
