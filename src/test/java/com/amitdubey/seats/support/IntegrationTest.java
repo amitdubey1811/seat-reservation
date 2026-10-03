@@ -53,6 +53,12 @@ public abstract class IntegrationTest {
         }
         // Keep the snapshot refresh brisk so a test that changes a limit does not wait.
         registry.add("seats.config.refresh-interval-ms", () -> "500");
+
+        // A deliberately generous pool for tests. The point of the concurrency suite is to
+        // observe contention on *rows*; if requests instead queued at the connection pool
+        // they would be shed as 429s, and the test would be measuring Hikari rather than the
+        // behaviour under test.
+        registry.add("spring.datasource.hikari.maximum-pool-size", () -> "48");
     }
 
     private static String env(String name, String fallback) {
@@ -65,6 +71,9 @@ public abstract class IntegrationTest {
 
     @Autowired
     protected JdbcTemplate jdbc;
+
+    @Autowired
+    protected io.micrometer.core.instrument.MeterRegistry meters;
 
     @Autowired
     private com.amitdubey.seats.config.AuthProperties authProperties;
@@ -86,6 +95,17 @@ public abstract class IntegrationTest {
                 """);
         jdbc.update("UPDATE service_config SET value = '4' WHERE key = 'reservation.per_user_limit'");
         jdbc.update("UPDATE service_config SET value = '10' WHERE key = 'reservation.max_seats_per_request'");
+    }
+
+    /**
+     * A counter's current value, or 0 if it has never been touched.
+     *
+     * <p>The Spring context is cached across test classes, so counters accumulate. Compare
+     * before-and-after values rather than absolute ones.
+     */
+    protected double counter(String name) {
+        var found = meters.find(name).counter();
+        return found == null ? 0.0 : found.count();
     }
 
     protected long countRows(String table) {
