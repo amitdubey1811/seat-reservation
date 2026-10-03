@@ -10,13 +10,17 @@ COPY src ./src
 RUN mvn -B -q -DskipTests package
 
 # ---- runtime --------------------------------------------------------------
-FROM eclipse-temurin:21-jre AS runtime
+# Alpine rather than the Ubuntu-based JRE: the base is roughly a quarter of the size, and
+# on a free-tier host a smaller image means a faster pull and a faster cold start.
+FROM eclipse-temurin:21-jre-alpine AS runtime
 WORKDIR /app
 
-RUN groupadd --system app && useradd --system --gid app --no-create-home app
+# Alpine's BusyBox tools, not Debian's groupadd/useradd.
+RUN addgroup -S app && adduser -S -G app -H app
 
-COPY --from=build /build/target/seat-reservation-*.jar /app/app.jar
-RUN chown -R app:app /app
+# --chown on the COPY itself, not a following `RUN chown -R`. The latter rewrites every
+# file and so stores a second complete copy of the 60 MB jar in its own layer.
+COPY --from=build --chown=app:app /build/target/seat-reservation-*.jar /app/app.jar
 USER app
 
 ENV JAVA_OPTS="-XX:MaxRAMPercentage=70.0 -XX:+ExitOnOutOfMemoryError"
