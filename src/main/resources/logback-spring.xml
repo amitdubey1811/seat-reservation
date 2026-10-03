@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Structured logging.
+
+  JSON is the default rather than an opt-in, because the deployed service is where logs
+  actually get read, and a hosted log viewer can filter on fields but not on a sentence.
+  The point of the request id is to be queryable: `request_id = "abc"` returns the whole
+  story of one request, including the line where it was declined.
+
+  Human-readable output is still one flag away for local work:
+
+      -Dspring.profiles.active=pretty
+-->
+<configuration>
+
+    <springProperty scope="context" name="appName" source="spring.application.name"
+                    defaultValue="seat-reservation"/>
+
+    <!-- Deployed, and the default everywhere else. One JSON object per line. -->
+    <springProfile name="!pretty">
+        <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+                <timestampPattern>yyyy-MM-dd'T'HH:mm:ss.SSSXXX</timestampPattern>
+                <fieldNames>
+                    <timestamp>timestamp</timestamp>
+                    <message>message</message>
+                    <logger>logger</logger>
+                    <thread>thread</thread>
+                    <levelValue>[ignore]</levelValue>
+                </fieldNames>
+                <!--
+                  Everything in the MDC is promoted to a top-level field, which is what makes
+                  request_id filterable rather than buried in the message text.
+                -->
+                <includeMdc>true</includeMdc>
+                <customFields>{"service":"${appName}"}</customFields>
+                <!-- Stack traces shortened: the top frames say what broke, and 200 lines of
+                     framework internals per error is how a free-tier log quota disappears. -->
+                <throwableConverter class="net.logstash.logback.stacktrace.ShortenedThrowableConverter">
+                    <maxDepthPerThrowable>20</maxDepthPerThrowable>
+                    <maxLength>4096</maxLength>
+                    <rootCauseFirst>true</rootCauseFirst>
+                    <exclude>^sun\.reflect\..*</exclude>
+                    <exclude>^java\.lang\.reflect\..*</exclude>
+                    <exclude>^org\.springframework\.cglib\..*</exclude>
+                </throwableConverter>
+            </encoder>
+        </appender>
+    </springProfile>
+
+    <!-- Local reading. Same events, same request id, just legible to a person. -->
+    <springProfile name="pretty">
+        <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder>
+                <pattern>%d{HH:mm:ss.SSS} %highlight(%-5level) [%X{request_id:--}] %cyan(%logger{28}) : %msg%n%ex{12}</pattern>
+            </encoder>
+        </appender>
+    </springProfile>
+
+    <root level="INFO">
+        <appender-ref ref="STDOUT"/>
+    </root>
+
+    <logger name="com.amitdubey.seats" level="INFO"/>
+
+    <!-- Quiet at startup; these say nothing a reader needs during an incident. -->
+    <logger name="org.hibernate.orm.connections.pooling" level="WARN"/>
+    <logger name="org.springframework.orm.jpa" level="WARN"/>
+
+</configuration>
