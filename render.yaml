@@ -47,6 +47,20 @@ services:
       - key: DB_POOL_SIZE
         value: "10"
 
+      # Far longer than the local default of 2s, and deliberately so.
+      #
+      # On a small instance a burst queues at the pool. With a short timeout those callers
+      # are shed as 429 before they ever reach the seat, so a hot-seat storm reports mostly
+      # back-pressure instead of the one-winner-many-conflicts picture that actually
+      # describes what happened. Waiting lets each caller reach the row, discover the seat
+      # is gone, and receive the 409 that is the truthful answer.
+      #
+      # Waiting is cheap here because the service runs on virtual threads: a parked request
+      # costs a few hundred bytes, not an OS thread. A genuinely stuck pool still sheds —
+      # 20s is a long wait, not an unbounded one.
+      - key: DB_POOL_TIMEOUT_MS
+        value: "20000"
+
       # Size the heap from the container's limit, not the host's. Without this a JVM in a
       # 512 MB container can size a heap for the whole machine and get OOM-killed.
       # ExitOnOutOfMemoryError makes the container die loudly so Render restarts it,
