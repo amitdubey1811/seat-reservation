@@ -6,6 +6,7 @@ import com.amitdubey.seats.serviceconfig.dto.ConfigResponse;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -45,6 +46,7 @@ public class ServiceConfigService {
             new AtomicReference<>(ConfigSnapshot.defaults());
     private final Counter reloads;
     private final Counter reloadFailures;
+    private volatile boolean shuttingDown;
 
     public ServiceConfigService(ServiceConfigRepository repository, MeterRegistry meters) {
         this.repository = repository;
@@ -83,7 +85,23 @@ public class ServiceConfigService {
 
     @Scheduled(fixedDelayString = "${seats.config.refresh-interval-ms:10000}")
     void refreshOnSchedule() {
+        if (shuttingDown) {
+            return;
+        }
         refresh();
+    }
+
+    /**
+     * Stops the scheduled refresh before the persistence layer closes.
+     *
+     * <p>Without this, the final tick races context shutdown and fails against a closed
+     * EntityManagerFactory, logging "configuration reload failed" at ERROR on every clean
+     * stop. On a platform that restarts containers routinely that is a recurring false
+     * alarm, and false alarms are how real ones get ignored.
+     */
+    @PreDestroy
+    void stop() {
+        shuttingDown = true;
     }
 
     /**
@@ -125,6 +143,10 @@ public class ServiceConfigService {
             reloads.increment();
             return true;
         } catch (RuntimeException e) {
+            if (shuttingDown) {
+                log.debug("configuration reload abandoned during shutdown");
+                return false;
+            }
             reloadFailures.increment();
             log.error("configuration reload failed; keeping the last good snapshot {}",
                     current.get(), e);
